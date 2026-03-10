@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/Quiz_number_App/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/Quiz_number_App/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/Quiz_number_App/build" />
+      <excludeFolder url="file://$MODULE_DIR$/dice_guess_number_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/dice_guess_number_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/dice_guess_number_app/build" />
+      <excludeFolder url="file://$MODULE_DIR$/expense_manage_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/expense_manage_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/expense_manage_app/build" />
+      <excludeFolder url="file://$MODULE_DIR$/information_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/information_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/information_app/build" />
+      <excludeFolder url="file://$MODULE_DIR$/myapp/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/myapp/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/myapp/build" />
+      <excludeFolder url="file://$MODULE_DIR$/student_info_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/student_info_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/student_info_app/build" />
+      <excludeFolder url="file://$MODULE_DIR$/student_info_panel_app/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/student_info_panel_app/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/student_info_panel_app/build" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
