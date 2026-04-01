@@ -1,0 +1,25 @@
+﻿Analyzing lib...                                                
+
+  error - Missing concrete implementation of 'abstract class State<T extends StatefulWidget> with Diagnosticable.build' - lib\features\chat\presentation\chat_screen.dart:24:7 - non_abstract_class_inherits_abstract_member
+warning - The declaration '_sendMessage' isn't referenced - lib\features\chat\presentation\chat_screen.dart:48:8 - unused_element
+warning - The declaration '_newChat' isn't referenced - lib\features\chat\presentation\chat_screen.dart:53:8 - unused_element
+  error - Expected a class member - lib\features\chat\presentation\chat_screen.dart:93:9 - expected_class_member
+  error - Expected a class member - lib\features\chat\presentation\chat_screen.dart:93:10 - expected_class_member
+  error - Expected a class member - lib\features\chat\presentation\chat_screen.dart:94:7 - expected_class_member
+  error - Expected a class member - lib\features\chat\presentation\chat_screen.dart:94:8 - expected_class_member
+  error - Expected a class member - lib\features\chat\presentation\chat_screen.dart:95:5 - expected_class_member
+  error - Expected a class member - lib\features\chat\presentation\chat_screen.dart:95:6 - expected_class_member
+  error - Undefined name 'ref' - lib\features\chat\presentation\chat_screen.dart:100:23 - undefined_identifier
+  error - Undefined name 'ref' - lib\features\chat\presentation\chat_screen.dart:101:23 - undefined_identifier
+  error - Undefined name 'ref' - lib\features\chat\presentation\chat_screen.dart:106:5 - undefined_identifier
+  error - The function '_scrollToBottom' isn't defined - lib\features\chat\presentation\chat_screen.dart:111:9 - undefined_function
+  error - Undefined name '_sendMessage' - lib\features\chat\presentation\chat_screen.dart:125:39 - undefined_identifier
+  error - Undefined name '_sendMessage' - lib\features\chat\presentation\chat_screen.dart:131:21 - undefined_identifier
+  error - Undefined name 'ref' - lib\features\chat\presentation\chat_screen.dart:196:19 - undefined_identifier
+  error - Undefined name '_newChat' - lib\features\chat\presentation\chat_screen.dart:219:64 - undefined_identifier
+  error - Expected an identifier - lib\features\chat\presentation\chat_screen.dart:227:15 - missing_identifier
+  error - Expected to find ']' - lib\features\chat\presentation\chat_screen.dart:227:15 - expected_token
+  error - Undefined name '_scrollController' - lib\features\chat\presentation\chat_screen.dart:237:19 - undefined_identifier
+  error - Undefined name 'context' - lib\features\chat\presentation\chat_screen.dart:239:28 - undefined_identifier
+  error - Expected a method, getter, setter or operator declaration - lib\features\chat\presentation\chat_screen.dart:259:1 - expected_executable
+
