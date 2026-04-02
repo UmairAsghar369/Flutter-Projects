@@ -115,6 +115,18 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen>
       }
       _reminderMinutes = t.reminderMinutes;
 
+      // Handle custom reminder minutes not in predefined options
+      if (!_reminderOptions.containsValue(_reminderMinutes) && _reminderMinutes != null) {
+        if (t.dueDate != null && t.dueTime != null) {
+          try {
+            final dd = DateTime.parse(t.dueDate!);
+            final parts = t.dueTime!.split(':');
+            final dueDT = DateTime(dd.year, dd.month, dd.day, int.parse(parts[0]), int.parse(parts[1]));
+            _customReminderDateTime = dueDT.subtract(Duration(minutes: _reminderMinutes!));
+          } catch (_) {}
+        }
+        _reminderMinutes = -1;
+      }
       // Load existing subtasks
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final provider = context.read<TaskProvider>();
@@ -635,6 +647,8 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen>
     final subtaskTitles =
         _subtaskControllers.map((c) => c.text).where((t) => t.trim().isNotEmpty).toList();
 
+    // ── Step 1: Save task to DB (must always succeed) ─────────────
+    Task? savedTask;
     try {
       if (_isEditing) {
         final updated = widget.task!.copyWith(
@@ -650,33 +664,7 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen>
           reminderMinutes: actualReminderMinutes,
         );
         await provider.updateTask(updated, subtasks: subtaskTitles);
-
-        // Reschedule reminder
-        if (updated.notificationId != null) {
-          await NotificationService.instance
-              .cancelNotification(updated.notificationId!);
-        }
-        if (actualReminderMinutes != null &&
-            actualReminderMinutes > 0 &&
-            dueDate != null &&
-            dueTime != null) {
-          final dueDateTime = DateTime(
-            _dueDate!.year, _dueDate!.month, _dueDate!.day,
-            _dueTime!.hour, _dueTime!.minute,
-          );
-          final reminderTime =
-              dueDateTime.subtract(Duration(minutes: actualReminderMinutes));
-          final soundName = themeProvider.notificationSound == 'default'
-              ? null
-              : themeProvider.notificationSound;
-          await NotificationService.instance.scheduleReminder(
-            notificationId: updated.notificationId ?? updated.id!,
-            taskTitle: updated.title,
-            scheduledDate: reminderTime,
-            reminderMinutes: actualReminderMinutes,
-            soundName: soundName,
-          );
-        }
+        savedTask = updated;
       } else {
         final newTask = Task(
           title: _titleController.text.trim(),
@@ -690,47 +678,93 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen>
           repeatDays: _isRepeating ? repeatDays : null,
           reminderMinutes: actualReminderMinutes,
         );
-        final saved =
-            await provider.addTask(newTask, subtasks: subtaskTitles);
-
-        // Fire instant notification
-        final soundName = themeProvider.notificationSound == 'default'
-            ? null
-            : themeProvider.notificationSound;
-        await NotificationService.instance.showTaskAddedNotification(
-          taskId: saved.id!,
-          taskTitle: saved.title,
-          soundName: soundName,
-        );
-
-        // Schedule reminder
-        if (actualReminderMinutes != null &&
-            actualReminderMinutes > 0 &&
-            dueTime != null) {
-          final taskDueDate = _dueDate ?? DateTime.now();
-          final dueDateTime = DateTime(
-            taskDueDate.year, taskDueDate.month, taskDueDate.day,
-            _dueTime!.hour, _dueTime!.minute,
-          );
-          final reminderTime =
-              dueDateTime.subtract(Duration(minutes: actualReminderMinutes));
-          await NotificationService.instance.scheduleReminder(
-            notificationId: saved.notificationId ?? saved.id!,
-            taskTitle: saved.title,
-            scheduledDate: reminderTime,
-            reminderMinutes: actualReminderMinutes,
-            soundName: soundName,
-          );
-        }
+        savedTask = await provider.addTask(newTask, subtasks: subtaskTitles);
       }
-
-      if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving task: $e')),
         );
       }
+      return; // Stop here — DB save failed
+    }
+
+    // Navigate back immediately after DB save — notifications are best-effort
+    if (mounted) Navigator.of(context).pop();
+
+    // ── Step 2: Schedule notifications (best-effort, never blocks UI) ──
+    // All NotificationService methods already handle errors internally;
+    // this extra try-catch is a final safety net.
+    try {
+      final soundName = themeProvider.notificationSound == 'default'
+          ? null
+          : themeProvider.notificationSound;
+
+      if (_isEditing) {
+        // Cancel old notifications first
+        if (savedTask.notificationId != null) {
+          await NotificationService.instance
+              .cancelNotification(savedTask.notificationId!);
+        }
+        if (dueDate != null && dueTime != null) {
+          final dueDateTime = DateTime(
+            _dueDate!.year, _dueDate!.month, _dueDate!.day,
+            _dueTime!.hour, _dueTime!.minute,
+          );
+          if (actualReminderMinutes != null && actualReminderMinutes > 0) {
+            final reminderTime =
+                dueDateTime.subtract(Duration(minutes: actualReminderMinutes));
+            await NotificationService.instance.scheduleReminder(
+              notificationId: savedTask.notificationId ?? savedTask.id!,
+              taskTitle: savedTask.title,
+              scheduledDate: reminderTime,
+              reminderMinutes: actualReminderMinutes,
+              soundName: soundName,
+            );
+          }
+          await NotificationService.instance.scheduleDueTimeNotification(
+            taskId: savedTask.id!,
+            taskTitle: savedTask.title,
+            dueDateTime: dueDateTime,
+            soundName: soundName,
+          );
+        }
+      } else {
+        // Instant "task added" notification
+        await NotificationService.instance.showTaskAddedNotification(
+          taskId: savedTask.id!,
+          taskTitle: savedTask.title,
+          soundName: soundName,
+        );
+        // Time-based notifications if due time is set
+        if (dueTime != null) {
+          final taskDueDate = _dueDate ?? DateTime.now();
+          final dueDateTime = DateTime(
+            taskDueDate.year, taskDueDate.month, taskDueDate.day,
+            _dueTime!.hour, _dueTime!.minute,
+          );
+          if (actualReminderMinutes != null && actualReminderMinutes > 0) {
+            final reminderTime =
+                dueDateTime.subtract(Duration(minutes: actualReminderMinutes));
+            await NotificationService.instance.scheduleReminder(
+              notificationId: savedTask.notificationId ?? savedTask.id!,
+              taskTitle: savedTask.title,
+              scheduledDate: reminderTime,
+              reminderMinutes: actualReminderMinutes,
+              soundName: soundName,
+            );
+          }
+          await NotificationService.instance.scheduleDueTimeNotification(
+            taskId: savedTask.id!,
+            taskTitle: savedTask.title,
+            dueDateTime: dueDateTime,
+            soundName: soundName,
+          );
+        }
+      }
+    } catch (e) {
+      // Notification scheduling failed but task was saved — just log it.
+      debugPrint('_saveTask: notification scheduling error (non-fatal): $e');
     }
   }
 }

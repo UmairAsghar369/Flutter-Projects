@@ -77,25 +77,23 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
       floatingActionButton: ScaleTransition(
         scale: _fabPulse,
-        child: Hero(
-          tag: 'add_task_fab',
-          child: FloatingActionButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AddEditTaskScreen()),
-              );
-            },
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                ),
+        child: FloatingActionButton(
+          heroTag: 'add_task_fab',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AddEditTaskScreen()),
+            );
+          },
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [AppColors.primary, AppColors.primaryDark],
               ),
-              child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
             ),
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
           ),
         ),
       ),

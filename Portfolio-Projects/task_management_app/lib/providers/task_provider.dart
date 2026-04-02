@@ -129,7 +129,10 @@ class TaskProvider extends ChangeNotifier {
   /// Deletes a task by [taskId] and cancels its notifications.
   Future<void> deleteTask(int taskId) async {
     await _db.deleteTask(taskId);
+    // cancelNotification now also cancels the due-time notification internally
     await NotificationService.instance.cancelNotification(taskId);
+    // Also cancel the "task added" instant notification (offset +100000)
+    await NotificationService.instance.cancelNotification(taskId + 100000);
     _allTasks.removeWhere((t) => t.id == taskId);
     _subtasksMap.remove(taskId);
     notifyListeners();
@@ -152,8 +155,9 @@ class TaskProvider extends ChangeNotifier {
     await _db.updateTask(updated);
     _allTasks[idx] = updated;
 
-    // Cancel reminder if completed
+    // Cancel both advance-reminder AND due-time notification when completed
     if (updated.isCompleted && updated.notificationId != null) {
+      // cancelNotification already cancels the due-time notification too
       await NotificationService.instance
           .cancelNotification(updated.notificationId!);
     }
@@ -235,13 +239,12 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Internal helper to schedule a reminder for a task.
+  /// Internal helper to schedule reminders for a repeating task after reset.
+  ///
+  /// Schedules both the advance reminder (X minutes before due) and the
+  /// due-time notification (fires exactly at the due date/time).
   void _scheduleReminderForTask(Task task) {
-    if (task.dueDate == null ||
-        task.dueTime == null ||
-        task.reminderMinutes == null) {
-      return;
-    }
+    if (task.dueDate == null || task.dueTime == null) return;
     try {
       final dateParts = task.dueDate!.split('-');
       final timeParts = task.dueTime!.split(':');
@@ -252,14 +255,24 @@ class TaskProvider extends ChangeNotifier {
         int.parse(timeParts[0]),
         int.parse(timeParts[1]),
       );
-      final reminderTime =
-          dueDateTime.subtract(Duration(minutes: task.reminderMinutes!));
 
-      NotificationService.instance.scheduleReminder(
-        notificationId: task.notificationId ?? task.id!,
+      // Schedule advance reminder if set
+      if (task.reminderMinutes != null && task.reminderMinutes! > 0) {
+        final reminderTime =
+            dueDateTime.subtract(Duration(minutes: task.reminderMinutes!));
+        NotificationService.instance.scheduleReminder(
+          notificationId: task.notificationId ?? task.id!,
+          taskTitle: task.title,
+          scheduledDate: reminderTime,
+          reminderMinutes: task.reminderMinutes!,
+        );
+      }
+
+      // Always schedule due-time notification when due date/time is set
+      NotificationService.instance.scheduleDueTimeNotification(
+        taskId: task.id!,
         taskTitle: task.title,
-        scheduledDate: reminderTime,
-        reminderMinutes: task.reminderMinutes!,
+        dueDateTime: dueDateTime,
       );
     } catch (e) {
       debugPrint('Error scheduling reminder: $e');
