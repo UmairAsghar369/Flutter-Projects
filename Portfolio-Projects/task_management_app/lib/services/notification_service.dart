@@ -98,8 +98,28 @@ class NotificationService {
   /// Requests all required notification permissions.
   Future<void> requestPermissions() async {
     if (kIsWeb) return;
+    
+    // First, use the official flutter_local_notifications implementation for Android 13+
+    final androidImplementation = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+        
+    if (androidImplementation != null) {
+      await androidImplementation.requestNotificationsPermission();
+      await androidImplementation.requestExactAlarmsPermission();
+    }
+    
+    // Fallback using permission_handler to ensure maximum compatibility
     await Permission.notification.request();
     await Permission.scheduleExactAlarm.request();
+  }
+
+  /// Returns true if the "Alarms & Reminders" exact alarm permission is granted.
+  ///
+  /// On Android 12+ this permission must be explicitly granted by the user
+  /// in Settings → Apps → TaskFlow → Alarms & Reminders.
+  Future<bool> isExactAlarmGranted() async {
+    if (kIsWeb) return true;
+    return Permission.scheduleExactAlarm.isGranted;
   }
 
   // ── Notification Channels ───────────────────────────────────────
@@ -142,7 +162,9 @@ class NotificationService {
           body,
           tzDate,
           details,
-          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          // alarmClock mode: highest-priority, exempt from Doze, always fires.
+          // Requires SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM permission.
+          androidScheduleMode: AndroidScheduleMode.alarmClock,
           uiLocalNotificationDateInterpretation:
               UILocalNotificationDateInterpretation.absoluteTime,
           payload: payload,

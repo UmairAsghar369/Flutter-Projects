@@ -17,7 +17,6 @@ Future<void> main() async {
 
   // Initialize notification service
   await NotificationService.instance.init();
-  await NotificationService.instance.requestPermissions();
 
   // Load theme preferences
   final themeProvider = ThemeProvider();

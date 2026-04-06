@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 
@@ -39,6 +40,8 @@ class SettingsScreen extends StatelessWidget {
           // ── Notifications ──
           _SectionHeader(title: 'Notifications', isDark: isDark),
           const SizedBox(height: 8),
+          const _PermissionStatusSection(),
+          const SizedBox(height: 12),
           _buildSoundSelector(context, themeProvider, isDark),
           const SizedBox(height: 20),
 
@@ -487,6 +490,150 @@ class _ExportButton extends StatelessWidget {
       title: Text(label),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: onTap,
+    );
+  }
+}
+
+// ── Permission Status Section ────────────────────────────────────────────────
+
+/// Shows the current status of notification & alarm permissions
+/// with a button to fix them if denied.
+class _PermissionStatusSection extends StatelessWidget {
+  const _PermissionStatusSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return FutureBuilder<List<PermissionStatus>>(
+      future: Future.wait([
+        Permission.notification.status,
+        Permission.scheduleExactAlarm.status,
+      ]),
+      builder: (context, snap) {
+        final notifGranted = snap.data?[0].isGranted ?? false;
+        final alarmGranted = snap.data?[1].isGranted ?? false;
+        final allGranted = notifGranted && alarmGranted;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E2E) : const Color(0xFFF8F8FF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: allGranted
+                  ? Colors.green.withValues(alpha: 0.4)
+                  : Colors.orange.withValues(alpha: 0.5),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    allGranted
+                        ? Icons.verified_rounded
+                        : Icons.warning_amber_rounded,
+                    color: allGranted ? Colors.green : Colors.orange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    allGranted
+                        ? 'All permissions granted'
+                        : 'Some permissions missing',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: allGranted ? Colors.green : Colors.orange,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _PermRow(
+                label: 'Notifications',
+                granted: notifGranted,
+                loading: snap.connectionState == ConnectionState.waiting,
+              ),
+              const SizedBox(height: 6),
+              _PermRow(
+                label: 'Alarms & Reminders',
+                granted: alarmGranted,
+                loading: snap.connectionState == ConnectionState.waiting,
+              ),
+              if (!allGranted && snap.connectionState == ConnectionState.done) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.settings_rounded, size: 18),
+                    label: const Text('Open App Settings to Fix'),
+                    onPressed: () => openAppSettings(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PermRow extends StatelessWidget {
+  final String label;
+  final bool granted;
+  final bool loading;
+
+  const _PermRow({
+    required this.label,
+    required this.granted,
+    required this.loading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          loading
+              ? Icons.hourglass_empty_rounded
+              : granted
+                  ? Icons.check_circle_rounded
+                  : Icons.cancel_rounded,
+          size: 18,
+          color: loading
+              ? Colors.grey
+              : granted
+                  ? Colors.green
+                  : Colors.red.shade400,
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 13)),
+        const Spacer(),
+        Text(
+          loading ? '...' : (granted ? 'Granted' : 'Denied'),
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: loading
+                ? Colors.grey
+                : granted
+                    ? Colors.green
+                    : Colors.red.shade400,
+          ),
+        ),
+      ],
     );
   }
 }

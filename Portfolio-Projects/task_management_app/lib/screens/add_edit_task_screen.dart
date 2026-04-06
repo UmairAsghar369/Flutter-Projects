@@ -591,19 +591,57 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen>
     });
   }
 
+  /// Shows a bottom sheet prompting the user to optionally set a due time.
+  ///
+  /// Returns 'proceed' if saving should continue (quick choice or skip),
+  /// 'custom' if the user wants to pick a custom date/time, or
+  /// null if the sheet was dismissed without a choice.
+  Future<String?> _showTimerBottomSheet() {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _TimerPromptSheet(
+        onQuickTime: (DateTime dt) {
+          setState(() {
+            _dueDate = DateTime(dt.year, dt.month, dt.day);
+            _dueTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
+          });
+          Navigator.pop(ctx, 'proceed');
+        },
+        onCustomTime: () => Navigator.pop(ctx, 'custom'),
+        onSkip: () => Navigator.pop(ctx, 'proceed'),
+      ),
+    );
+  }
+
   Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Capture providers synchronously before any async gaps
+    final provider = context.read<TaskProvider>();
+    final themeProvider = context.read<ThemeProvider>();
+
+    // ── Timer prompt: ask user to set due time if none is set ─────
+    if (!_isEditing && _dueTime == null) {
+      final result = await _showTimerBottomSheet();
+      if (result == null) return; // user dismissed the sheet
+      if (result == 'custom') {
+        await _pickDate();
+        if (!mounted || _dueDate == null) return; // date picker cancelled
+        await _pickTime();
+        if (!mounted) return;
+      }
+    }
+
     // Validate: due time required if reminder is set
-    if (_reminderMinutes != null && _reminderMinutes != null && _dueTime == null) {
+    if (_reminderMinutes != null && _dueTime == null) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Due time is required when reminder is set')),
       );
       return;
     }
-
-    final provider = context.read<TaskProvider>();
-    final themeProvider = context.read<ThemeProvider>();
 
     // Build repeat_days string
     String? repeatDays;
@@ -766,5 +804,217 @@ class _AddEditTaskScreenState extends State<AddEditTaskScreen>
       // Notification scheduling failed but task was saved — just log it.
       debugPrint('_saveTask: notification scheduling error (non-fatal): $e');
     }
+  }
+}
+
+// ── Timer Prompt Sheet ────────────────────────────────────────────────────
+
+class _TimerPromptSheet extends StatelessWidget {
+  final void Function(DateTime dt) onQuickTime;
+  final VoidCallback onCustomTime;
+  final VoidCallback onSkip;
+
+  const _TimerPromptSheet({
+    required this.onQuickTime,
+    required this.onCustomTime,
+    required this.onSkip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final now = DateTime.now();
+    final in1h = now.add(const Duration(hours: 1));
+    final in2h = now.add(const Duration(hours: 2));
+    final tonight = DateTime(now.year, now.month, now.day, 21, 0);
+    final tomorrow = now.add(const Duration(days: 1));
+    final tomorrowMorning =
+        DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 9, 0);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkCard : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 12,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Icon
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.alarm_add_rounded,
+              size: 32,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          Text(
+            'Set a Due Time?',
+            style: AppTextStyles.h3(
+              color:
+                  isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'When should this task be completed?',
+            style: AppTextStyles.body(
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+
+          // Quick time options grid
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 3.2,
+            children: [
+              _QuickTimeChip(
+                label: 'In 1 Hour',
+                icon: Icons.hourglass_top_rounded,
+                color: AppColors.primary,
+                onTap: () => onQuickTime(in1h),
+              ),
+              _QuickTimeChip(
+                label: 'In 2 Hours',
+                icon: Icons.hourglass_bottom_rounded,
+                color: AppColors.accent,
+                onTap: () => onQuickTime(in2h),
+              ),
+              _QuickTimeChip(
+                label: 'Tonight 9 PM',
+                icon: Icons.nightlight_round,
+                color: AppColors.accentAmber,
+                onTap: () => onQuickTime(tonight),
+              ),
+              _QuickTimeChip(
+                label: 'Tomorrow 9 AM',
+                icon: Icons.wb_sunny_rounded,
+                color: AppColors.accentGreen,
+                onTap: () => onQuickTime(tomorrowMorning),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Custom time button
+          OutlinedButton.icon(
+            onPressed: onCustomTime,
+            icon: const Icon(Icons.edit_calendar_rounded),
+            label: const Text('Pick Custom Date & Time'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Skip button
+          TextButton(
+            onPressed: onSkip,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(double.infinity, 44),
+            ),
+            child: Text(
+              'Skip — Save without due time',
+              style: AppTextStyles.body(
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Quick Time Chip ───────────────────────────────────────────────────────
+
+class _QuickTimeChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickTimeChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
