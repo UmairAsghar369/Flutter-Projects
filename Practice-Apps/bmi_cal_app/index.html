@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="A premium BMI Calculator with animated gauge, unit toggle, and history tracker." />
+  <title>BMI Calculator — Premium Health Tool</title>
+  <style>
+    /* ═══════════════════════════════════════
+       RESET & BASE
+       ═══════════════════════════════════════ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    @font-face {
+      font-family: 'SystemUI';
+      src: local('Segoe UI'), local('-apple-system'), local('Helvetica Neue'), local('Arial');
+    }
+
+    :root {
+      --bg-primary:    #0a0e17;
+      --bg-card:       #111827;
+      --bg-card-alt:   #1a2236;
+      --bg-input:      #0d1322;
+      --border:        rgba(255,255,255,.06);
+      --border-focus:  rgba(99,102,241,.5);
+      --text-primary:  #f1f5f9;
+      --text-secondary:#94a3b8;
+      --text-muted:    #475569;
+      --accent-start:  #6366f1;
+      --accent-end:    #a855f7;
+      --accent-glow:   rgba(99,102,241,.25);
+      --success:       #22c55e;
+      --warning:       #f59e0b;
+      --danger:        #ef4444;
+      --info:          #3b82f6;
+      --radius:        16px;
+      --radius-sm:     10px;
+      --transition:    .35s cubic-bezier(.4,0,.2,1);
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      font-family: 'SystemUI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px 16px 64px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Ambient background blobs */
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: .18;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before {
+      width: 500px; height: 500px;
+      background: var(--accent-start);
+      top: -120px; left: -100px;
+      animation: blobDrift 18s ease-in-out infinite alternate;
+    }
+    body::after {
+      width: 420px; height: 420px;
+      background: var(--accent-end);
+      bottom: -80px; right: -80px;
+      animation: blobDrift 22s ease-in-out infinite alternate-reverse;
+    }
+    @keyframes blobDrift {
+      0%   { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(60px, 40px) scale(1.15); }
+    }
+
+    /* ═══════════════════════════════════════
+       LAYOUT
+       ═══════════════════════════════════════ */
+    .app {
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ═══════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════ */
+    .header {
+      text-align: center;
+      padding: 8px 0 4px;
+    }
+    .header-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .header-icon {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 20px var(--accent-glow);
+    }
+    .header h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--text-primary) 40%, var(--accent-end));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -.02em;
+    }
+    .header p {
+      color: var(--text-secondary);
+      font-size: .85rem;
+      margin-top: 2px;
+    }
+
+    /* ═══════════════════════════════════════
+       CARDS
+       ═══════════════════════════════════════ */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(99,102,241,.04), transparent 60%);
+      pointer-events: none;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,.3);
+    }
+    .card-title {
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title span { font-size: 14px; }
+
+    /* ═══════════════════════════════════════
+       UNIT TOGGLE
+       ═══════════════════════════════════════ */
+    .toggle-wrapper {
+      display: flex;
+      background: var(--bg-input);
+      border-radius: 12px;
+      padding: 4px;
+      border: 1px solid var(--border);
+    }
+    .toggle-btn {
+      flex: 1;
+      padding: 10px 0;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: .85rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 9px;
+      transition: all var(--transition);
+      position: relative;
+      z-index: 1;
+    }
+    .toggle-btn.active {
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+      color: #fff;
+      box-shadow: 0 2px 12px var(--accent-glow);
+    }
+    .toggle-btn:not(.active):hover {
+      color: var(--text-primary);
+      background: rgba(255,255,255,.04);
+    }
+
+    /* ═══════════════════════════════════════
+       FORM INPUTS
+       ═══════════════════════════════════════ */
+    .input-group {
+      margin-bottom: 16px;
+      animation: fadeSlideUp .4s ease both;
+    }
+    .input-group:nth-child(2) { animation-delay: .05s; }
+    .input-group:nth-child(3) { animation-delay: .1s; }
+    .input-group:nth-child(4) { animation-delay: .15s; }
+
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .input-label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+    .input-field {
+      flex: 1;
+      position: relative;
+    }
+    .input-field input {
+      width: 100%;
+      padding: 12px 14px;
+      padding-right: 46px;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-weight: 600;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      -moz-appearance: textfield;
+    }
+    .input-field input::-webkit-outer-spin-button,
+    .input-field input::-webkit-inner-spin-button { -webkit-appearance: none; }
+    .input-field input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .input-unit {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      pointer-events: none;
+      text-transform: uppercase;
+    }
+
+    /* ═══════════════════════════════════════
+       CALCULATE BUTTON
+       ═══════════════════════════════════════ */
+    .btn-calculate {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform .2s ease, box-shadow .2s ease;
+      letter-spacing: .02em;
+    }
+    .btn-calculate::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, transparent, rgba(255,255,255,.15), transparent);
+      transform: translateX(-100%);
+      transition: transform .5s ease;
+    }
+    .btn-calculate:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px var(--accent-glow);
+    }
+    .btn-calculate:hover::before { transform: translateX(100%); }
+    .btn-calculate:active { transform: scale(.98); }
+
+    /* ═══════════════════════════════════════
+       GAUGE / RESULT
+       ═══════════════════════════════════════ */
+    .result-card {
+      text-align: center;
+      opacity: 0;
+      transform: translateY(20px) scale(.96);
+      transition: opacity .5s ease, transform .5s ease;
+      display: none;
+    }
+    .result-card.visible {
+      display: block;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .gauge-container {
+      position: relative;
+      width: 260px;
+      height: 150px;
+      margin: 0 auto 20px;
+    }
+    .gauge-svg {
+      width: 100%;
+      height: 100%;
+    }
+    .gauge-bg {
+      fill: none;
+      stroke: rgba(255,255,255,.06);
+      stroke-width: 18;
+      stroke-linecap: round;
+    }
+    .gauge-fill {
+      fill: none;
+      stroke-width: 18;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1),
+                  stroke 1.2s ease;
+      filter: drop-shadow(0 0 8px var(--accent-glow));
+    }
+    .gauge-tick {
+      stroke: rgba(255,255,255,.15);
+      stroke-width: 1.5;
+    }
+    .gauge-tick-label {
+      fill: var(--text-muted);
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .gauge-value {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+    .gauge-number {
+      font-size: 2.6rem;
+      font-weight: 800;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--text-primary), var(--accent-end));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 20px;
+      border-radius: 100px;
+      font-size: .85rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      animation: popIn .4s cubic-bezier(.34,1.56,.64,1) .6s both;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(.7); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .result-badge.underweight { background: rgba(59,130,246,.15); color: #60a5fa; border: 1px solid rgba(59,130,246,.2); }
+    .result-badge.normal      { background: rgba(34,197,94,.15);  color: #4ade80; border: 1px solid rgba(34,197,94,.2); }
+    .result-badge.overweight  { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.2); }
+    .result-badge.obese       { background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(239,68,68,.2); }
+
+    .result-detail {
+      color: var(--text-secondary);
+      font-size: .82rem;
+      line-height: 1.5;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+
+    /* Needle */
+    .gauge-needle {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      width: 4px;
+      height: 90px;
+      transform-origin: bottom center;
+      transform: translateX(-50%) rotate(-90deg);
+      transition: transform 1.2s cubic-bezier(.4,0,.2,1);
+    }
+    .gauge-needle::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 4px;
+      height: 70px;
+      background: linear-gradient(to bottom, var(--accent-end), transparent);
+      border-radius: 4px;
+    }
+    .gauge-needle::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 14px;
+      height: 14px;
+      background: var(--accent-end);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    /* ═════════════════════════════════════
+       BMI RANGE BAR
+       ═════════════════════════════════════ */
+    .bmi-range-bar {
+      margin-top: 18px;
+      padding: 0 4px;
+    }
+    .range-track {
+      height: 8px;
+      border-radius: 8px;
+      background: linear-gradient(to right, #3b82f6 0%, #22c55e 30%, #f59e0b 65%, #ef4444 100%);
+      position: relative;
+      margin-bottom: 8px;
+    }
+    .range-marker {
+      position: absolute;
+      top: -5px;
+      width: 18px;
+      height: 18px;
+      background: #fff;
+      border-radius: 50%;
+      border: 3px solid var(--accent-start);
+      transform: translateX(-50%);
+      transition: left 1.2s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+    .range-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: .65rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    /* ═══════════════════════════════════════
+       HISTORY
+       ═══════════════════════════════════════ */
+    .history-card { position: relative; }
+    .history-empty {
+      text-align: center;
+      padding: 20px 0;
+      color: var(--text-muted);
+      font-size: .85rem;
+    }
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--bg-card-alt);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      animation: fadeSlideUp .35s ease both;
+      transition: background var(--transition);
+    }
+    .history-item:hover { background: rgba(255,255,255,.04); }
+
+    .history-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .history-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .history-dot.underweight { background: var(--info); box-shadow: 0 0 8px rgba(59,130,246,.4); }
+    .history-dot.normal      { background: var(--success); box-shadow: 0 0 8px rgba(34,197,94,.4); }
+    .history-dot.overweight  { background: var(--warning); box-shadow: 0 0 8px rgba(245,158,11,.4); }
+    .history-dot.obese       { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,.4); }
+
+    .history-bmi {
+      font-weight: 700;
+      font-size: .95rem;
+    }
+    .history-date {
+      font-size: .72rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+    .history-category {
+      font-size: .72rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 100px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .history-category.underweight { background: rgba(59,130,246,.12); color: #60a5fa; }
+    .history-category.normal      { background: rgba(34,197,94,.12);  color: #4ade80; }
+    .history-category.overweight  { background: rgba(245,158,11,.12); color: #fbbf24; }
+    .history-category.obese       { background: rgba(239,68,68,.12);  color: #f87171; }
+
+    .btn-clear {
+      position: absolute;
+      top: 20px; right: 20px;
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: .7rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .btn-clear:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: rgba(239,68,68,.08);
+    }
+
+    /* ═══════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════ */
+    .footer {
+      text-align: center;
+      padding: 8px 0;
+      color: var(--text-muted);
+      font-size: .72rem;
+    }
+
+    /* ═══════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════ */
+    @media (max-width: 480px) {
+      body { padding: 16px 12px 48px; }
+      .card { padding: 20px 16px; }
+      .gauge-container { width: 220px; height: 130px; }
+      .gauge-number { font-size: 2.2rem; }
+      .gauge-needle { height: 75px; }
+      .gauge-needle::before { height: 58px; }
+    }
+
+    /* ═══════════════════════════════════════
+       SHAKE ERROR
+       ═══════════════════════════════════════ */
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%      { transform: translateX(-6px); }
+      40%      { transform: translateX(6px); }
+      60%      { transform: translateX(-4px); }
+      80%      { transform: translateX(4px); }
+    }
+    .shake { animation: shake .4s ease; }
+    .input-error { border-color: var(--danger) !important; }
+
+    /* ═══════════════════════════════════════
+       TOOLTIP
+       ═══════════════════════════════════════ */
+    .info-tip {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.06);
+      color: var(--text-muted);
+      font-size: .65rem;
+      text-align: center;
+      line-height: 16px;
+      cursor: help;
+      margin-left: 4px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    .info-tip::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--bg-card-alt);
+      color: var(--text-secondary);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: .72rem;
+      font-weight: 500;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease;
+      border: 1px solid var(--border);
+      z-index: 10;
+    }
+    .info-tip:hover::after { opacity: 1; }
+
+    /* ═══════════════════════════════════════
+       PARTICLE BURST (on calculate)
+       ═══════════════════════════════════════ */
+    .particle {
+      position: fixed;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 100;
+      animation: particleFly 1s ease-out forwards;
+    }
+    @keyframes particleFly {
+      0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+      100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-logo">
+        <div class="header-icon">⚖️</div>
+        <h1>BMI Calculator</h1>
+      </div>
+      <p>Track your body mass index with precision</p>
+    </header>
+
+    <!-- UNIT TOGGLE -->
+    <div class="card">
+      <div class="card-title"><span>📐</span> Unit System</div>
+      <div class="toggle-wrapper" id="unitToggle">
+        <button class="toggle-btn active" id="btnMetric" data-unit="metric" type="button">Metric (kg / cm)</button>
+        <button class="toggle-btn" id="btnImperial" data-unit="imperial" type="button">Imperial (lbs / ft·in)</button>
+      </div>
+    </div>
+
+    <!-- INPUT FORM -->
+    <div class="card" id="inputCard">
+      <div class="card-title"><span>📝</span> Your Measurements</div>
+
+      <!-- Metric Inputs -->
+      <div id="metricInputs">
+        <div class="input-group">
+          <label class="input-label" for="weightKg">Weight</label>
+          <div class="input-field">
+            <input type="number" id="weightKg" placeholder="70" min="1" max="500" step="0.1" />
+            <span class="input-unit">kg</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="heightCm">Height</label>
+          <div class="input-field">
+            <input type="number" id="heightCm" placeholder="175" min="1" max="300" step="0.1" />
+            <span class="input-unit">cm</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Imperial Inputs -->
+      <div id="imperialInputs" style="display:none;">
+        <div class="input-group">
+          <label class="input-label" for="weightLbs">Weight</label>
+          <div class="input-field">
+            <input type="number" id="weightLbs" placeholder="154" min="1" max="1100" step="0.1" />
+            <span class="input-unit">lbs</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="heightFt">Height</label>
+          <div class="input-row">
+            <div class="input-field">
+              <input type="number" id="heightFt" placeholder="5" min="0" max="9" step="1" />
+              <span class="input-unit">ft</span>
+            </div>
+            <div class="input-field">
+              <input type="number" id="heightIn" placeholder="9" min="0" max="11" step="0.1" />
+              <span class="input-unit">in</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn-calculate" id="btnCalculate" type="button">Calculate BMI</button>
+    </div>
+
+    <!-- RESULT -->
+    <div class="card result-card" id="resultCard">
+      <div class="card-title"><span>📊</span> Your Result</div>
+
+      <div class="gauge-container" id="gaugeContainer">
+        <svg class="gauge-svg" viewBox="0 0 260 150">
+          <!-- Gauge arc background -->
+          <path class="gauge-bg" d="M 25 135 A 105 105 0 0 1 235 135" />
+          <!-- Colored segments -->
+          <path d="M 25 135 A 105 105 0 0 1 235 135" fill="none" stroke="url(#gaugeGrad)" stroke-width="18" stroke-linecap="round"
+                stroke-dasharray="330" stroke-dashoffset="330" id="gaugeFill" />
+          <!-- Gradient definition -->
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stop-color="#3b82f6" />
+              <stop offset="30%"  stop-color="#22c55e" />
+              <stop offset="60%"  stop-color="#f59e0b" />
+              <stop offset="100%" stop-color="#ef4444" />
+            </linearGradient>
+          </defs>
+          <!-- Tick marks -->
+          <line x1="25"  y1="135" x2="25"  y2="122" class="gauge-tick" />
+          <line x1="77"  y1="55"  x2="84"  y2="65"  class="gauge-tick" />
+          <line x1="130" y1="30"  x2="130" y2="43"  class="gauge-tick" />
+          <line x1="183" y1="55"  x2="176" y2="65"  class="gauge-tick" />
+          <line x1="235" y1="135" x2="235" y2="122" class="gauge-tick" />
+          <!-- Tick labels -->
+          <text x="22"  y="148" class="gauge-tick-label" text-anchor="middle">15</text>
+          <text x="68"  y="50"  class="gauge-tick-label" text-anchor="middle">20</text>
+          <text x="130" y="22"  class="gauge-tick-label" text-anchor="middle">25</text>
+          <text x="192" y="50"  class="gauge-tick-label" text-anchor="middle">30</text>
+          <text x="238" y="148" class="gauge-tick-label" text-anchor="middle">40</text>
+        </svg>
+        <!-- Needle -->
+        <div class="gauge-needle" id="gaugeNeedle"></div>
+        <!-- Value -->
+        <div class="gauge-value">
+          <div class="gauge-number" id="gaugeNumber">—</div>
+        </div>
+      </div>
+
+      <div id="resultBadge" class="result-badge normal">● Normal</div>
+      <p class="result-detail" id="resultDetail"></p>
+
+      <!-- Range bar -->
+      <div class="bmi-range-bar">
+        <div class="range-track">
+          <div class="range-marker" id="rangeMarker" style="left: 0%;"></div>
+        </div>
+        <div class="range-labels">
+          <span>15</span><span>20</span><span>25</span><span>30</span><span>40</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- HISTORY -->
+    <div class="card history-card" id="historyCard">
+      <div class="card-title"><span>🕑</span> Recent History</div>
+      <button class="btn-clear" id="btnClear" type="button" style="display:none;">Clear</button>
+      <div id="historyContent">
+        <div class="history-empty">No entries yet. Calculate your BMI to start tracking.</div>
+      </div>
+    </div>
+
+    <footer class="footer">Built with precision · BMI is a screening tool, not a diagnostic</footer>
+  </div>
+
+  <script>
+    /* ═══════════════════════════════════════
+       STATE
+       ═══════════════════════════════════════ */
+    let currentUnit = 'metric';
+    let history = JSON.parse(localStorage.getItem('bmiHistory') || '[]');
+
+    /* ═══════════════════════════════════════
+       DOM REFS
+       ═══════════════════════════════════════ */
+    const $ = id => document.getElementById(id);
+    const btnMetric     = $('btnMetric');
+    const btnImperial   = $('btnImperial');
+    const metricInputs  = $('metricInputs');
+    const imperialInputs= $('imperialInputs');
+    const btnCalculate  = $('btnCalculate');
+    const resultCard    = $('resultCard');
+    const gaugeNumber   = $('gaugeNumber');
+    const gaugeNeedle   = $('gaugeNeedle');
+    const gaugeFill     = $('gaugeFill');
+    const resultBadge   = $('resultBadge');
+    const resultDetail  = $('resultDetail');
+    const rangeMarker   = $('rangeMarker');
+    const historyContent= $('historyContent');
+    const btnClear      = $('btnClear');
+    const inputCard     = $('inputCard');
+
+    /* ═══════════════════════════════════════
+       UNIT TOGGLE
+       ═══════════════════════════════════════ */
+    function setUnit(unit) {
+      currentUnit = unit;
+      btnMetric.classList.toggle('active', unit === 'metric');
+      btnImperial.classList.toggle('active', unit === 'imperial');
+      metricInputs.style.display   = unit === 'metric' ? 'block' : 'none';
+      imperialInputs.style.display = unit === 'imperial' ? 'block' : 'none';
+      // Re-trigger input animations
+      const groups = (unit === 'metric' ? metricInputs : imperialInputs).querySelectorAll('.input-group');
+      groups.forEach(g => { g.style.animation = 'none'; g.offsetHeight; g.style.animation = ''; });
+    }
+    btnMetric.addEventListener('click', () => setUnit('metric'));
+    btnImperial.addEventListener('click', () => setUnit('imperial'));
+
+    /* ═══════════════════════════════════════
+       CALCULATE
+       ═══════════════════════════════════════ */
+    btnCalculate.addEventListener('click', () => {
+      let weight, heightM;
+
+      if (currentUnit === 'metric') {
+        weight  = parseFloat($('weightKg').value);
+        const cm = parseFloat($('heightCm').value);
+        if (!validate([{el: $('weightKg'), v: weight}, {el: $('heightCm'), v: cm}])) return;
+        heightM = cm / 100;
+      } else {
+        weight    = parseFloat($('weightLbs').value);
+        const ft  = parseFloat($('heightFt').value) || 0;
+        const _in = parseFloat($('heightIn').value) || 0;
+        if (!validate([{el: $('weightLbs'), v: weight}, {el: $('heightFt'), v: ft}])) return;
+        const totalIn = ft * 12 + _in;
+        if (totalIn <= 0) { shakeField($('heightFt')); return; }
+        weight  = weight * 0.453592;
+        heightM = totalIn * 0.0254;
+      }
+
+      const bmi = weight / (heightM * heightM);
+      if (!isFinite(bmi) || bmi < 5 || bmi > 100) { shakeField(inputCard); return; }
+
+      showResult(bmi);
+      addHistory(bmi);
+      createParticles(btnCalculate);
+    });
+
+    function validate(fields) {
+      let ok = true;
+      fields.forEach(f => {
+        if (isNaN(f.v) || f.v <= 0) { shakeField(f.el); ok = false; }
+      });
+      return ok;
+    }
+    function shakeField(el) {
+      el.classList.add('shake');
+      const input = el.tagName === 'INPUT' ? el : el.querySelector('input');
+      if (input) input.classList.add('input-error');
+      setTimeout(() => {
+        el.classList.remove('shake');
+        if (input) input.classList.remove('input-error');
+      }, 500);
+    }
+
+    /* ═══════════════════════════════════════
+       SHOW RESULT
+       ═══════════════════════════════════════ */
+    function showResult(bmi) {
+      resultCard.classList.add('visible');
+      resultCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Animate number
+      animateNumber(gaugeNumber, bmi, 1000);
+
+      // Category
+      const cat = getCategory(bmi);
+
+      // Needle angle: map bmi 15-40 to -90° to +90°
+      const clamped = Math.max(15, Math.min(40, bmi));
+      const angle = ((clamped - 15) / 25) * 180 - 90;
+      gaugeNeedle.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+
+      // Gauge fill
+      const pct = (clamped - 15) / 25;
+      const arcLen = 330;
+      gaugeFill.style.strokeDashoffset = arcLen - arcLen * pct;
+
+      // Range bar marker
+      rangeMarker.style.left = `${pct * 100}%`;
+
+      // Badge
+      resultBadge.className = `result-badge ${cat.key}`;
+      resultBadge.innerHTML = `${cat.icon} ${cat.label}`;
+      resultBadge.style.animation = 'none';
+      resultBadge.offsetHeight;
+      resultBadge.style.animation = '';
+
+      // Detail text
+      resultDetail.textContent = cat.detail;
+    }
+
+    function animateNumber(el, target, dur) {
+      const start = performance.now();
+      const from = parseFloat(el.textContent) || 0;
+      function tick(now) {
+        const t = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3); // easeOutCubic
+        el.textContent = (from + (target - from) * ease).toFixed(1);
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    function getCategory(bmi) {
+      if (bmi < 18.5) return {
+        key: 'underweight', label: 'Underweight', icon: '💙',
+        detail: 'Your BMI suggests you are underweight. Consider consulting a healthcare provider about a balanced nutrition plan.'
+      };
+      if (bmi < 25) return {
+        key: 'normal', label: 'Normal Weight', icon: '💚',
+        detail: 'Great job! Your BMI is within the healthy range. Maintain your balanced diet and active lifestyle.'
+      };
+      if (bmi < 30) return {
+        key: 'overweight', label: 'Overweight', icon: '💛',
+        detail: 'Your BMI indicates overweight. Small lifestyle changes like more activity and mindful eating can help.'
+      };
+      return {
+        key: 'obese', label: 'Obese', icon: '❤️',
+        detail: 'Your BMI falls in the obese range. Seeking guidance from a healthcare professional is recommended.'
+      };
+    }
+
+    /* ═══════════════════════════════════════
+       HISTORY
+       ═══════════════════════════════════════ */
+    function addHistory(bmi) {
+      const entry = {
+        bmi: parseFloat(bmi.toFixed(1)),
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+        category: getCategory(bmi).key
+      };
+      history.unshift(entry);
+      if (history.length > 5) history = history.slice(0, 5);
+      localStorage.setItem('bmiHistory', JSON.stringify(history));
+      renderHistory();
+    }
+
+    function renderHistory() {
+      if (history.length === 0) {
+        historyContent.innerHTML = '<div class="history-empty">No entries yet. Calculate your BMI to start tracking.</div>';
+        btnClear.style.display = 'none';
+        return;
+      }
+      btnClear.style.display = 'block';
+      historyContent.innerHTML = '<div class="history-list">' + history.map((h, i) => `
+        <div class="history-item" style="animation-delay: ${i * .06}s">
+          <div class="history-left">
+            <div class="history-dot ${h.category}"></div>
+            <div>
+              <div class="history-bmi">${h.bmi}</div>
+              <div class="history-date">${h.date}</div>
+            </div>
+          </div>
+          <span class="history-category ${h.category}">${h.category}</span>
+        </div>
+      `).join('') + '</div>';
+    }
+
+    btnClear.addEventListener('click', () => {
+      history = [];
+      localStorage.removeItem('bmiHistory');
+      renderHistory();
+    });
+
+    // Initial render
+    renderHistory();
+
+    /* ═══════════════════════════════════════
+       PARTICLE BURST
+       ═══════════════════════════════════════ */
+    function createParticles(origin) {
+      const rect = origin.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const colors = ['#6366f1', '#a855f7', '#22c55e', '#f59e0b', '#3b82f6'];
+      for (let i = 0; i < 18; i++) {
+        const p = document.createElement('div');
+        p.className = 'particle';
+        const angle = (Math.PI * 2 * i) / 18;
+        const dist = 60 + Math.random() * 80;
+        p.style.left = cx + 'px';
+        p.style.top = cy + 'px';
+        p.style.background = colors[i % colors.length];
+        p.style.setProperty('--px', Math.cos(angle) * dist + 'px');
+        p.style.setProperty('--py', Math.sin(angle) * dist + 'px');
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 1000);
+      }
+    }
+
+    /* ═══════════════════════════════════════
+       KEYBOARD SUPPORT
+       ═══════════════════════════════════════ */
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Enter') btnCalculate.click();
+    });
+  </script>
+</body>
+</html>
